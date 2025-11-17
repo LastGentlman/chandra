@@ -36,6 +36,7 @@ build-backend = "setuptools.build_meta"
 [project.scripts]
 chandra = "chandra.scripts.cli:main"
 chandra_app = "chandra.scripts.run_app:main"
+chandra_api = "chandra.scripts.run_api:main"
 chandra_screenshot = "chandra.scripts.screenshot_app:main"
 chandra_vllm = "chandra.scripts.vllm:main"
 
