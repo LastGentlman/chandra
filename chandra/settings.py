@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     VLLM_GPUS: str = "0"
     MAX_VLLM_RETRIES: int = 6
 
+    # API authentication settings
+    CHANDRA_API_KEY: str | None = None
+    CHANDRA_REQUIRE_API_KEY: bool = False
+
     @computed_field
     @property
     def TORCH_DTYPE(self) -> torch.dtype:

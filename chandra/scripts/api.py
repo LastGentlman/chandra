@@ -16,6 +16,7 @@ import filetype
 from chandra.model import InferenceManager
 from chandra.model.schema import BatchInputItem
 from chandra.input import load_file
+from chandra.settings import settings
 
 
 app = Flask(__name__)
@@ -34,6 +35,47 @@ def after_request(response):
     return response
 
 
+def verify_api_key():
+    """Verifica la API key si está habilitada"""
+    # No verificar en health check ni en preflight
+    if request.endpoint == 'health' or request.method == "OPTIONS":
+        return None
+    
+    # Si no se requiere API key, permitir acceso
+    if not settings.CHANDRA_REQUIRE_API_KEY:
+        return None
+    
+    # Si se requiere pero no está configurada, permitir acceso (modo desarrollo)
+    if not settings.CHANDRA_API_KEY:
+        return None
+    
+    # Obtener API key del header Authorization o del parámetro api_key
+    api_key = None
+    
+    # Intentar desde header Authorization (formato: Bearer <key> o <key>)
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        api_key = auth_header[7:].strip()
+    elif auth_header:
+        api_key = auth_header.strip()
+    
+    # Si no está en el header, intentar desde parámetros (query string o form-data)
+    if not api_key:
+        api_key = request.args.get('api_key') or request.form.get('api_key')
+    
+    # Si es JSON, también verificar en el body
+    if not api_key and request.is_json:
+        data = request.get_json(silent=True)
+        if data and 'api_key' in data:
+            api_key = data['api_key']
+    
+    # Verificar la clave
+    if not api_key or api_key != settings.CHANDRA_API_KEY:
+        return jsonify({"error": "Invalid or missing API key"}), 401
+    
+    return None
+
+
 @app.before_request
 def handle_preflight():
     """Maneja las peticiones OPTIONS (preflight) de CORS"""
@@ -43,6 +85,11 @@ def handle_preflight():
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
         return response
+    
+    # Verificar API key antes de procesar la petición
+    api_key_error = verify_api_key()
+    if api_key_error:
+        return api_key_error
 
 
 def get_model(method: str = "vllm") -> InferenceManager:
