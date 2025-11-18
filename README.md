@@ -127,6 +127,42 @@ Launch the interactive demo for single-page processing:
 chandra_app
 ```
 
+### REST API
+
+Start the REST API server for integration with bots and applications:
+
+```bash
+chandra_api
+```
+
+The API runs on `http://localhost:5000` by default. Available endpoints:
+
+- `GET /api/health` - Health check
+- `POST /api/ocr` - Process file (image or PDF)
+- `POST /api/ocr/image` - Process image from base64
+
+**API Authentication (Optional):**
+
+To enable API key authentication, set environment variables:
+
+```bash
+CHANDRA_API_KEY=your_secret_key_here
+CHANDRA_REQUIRE_API_KEY=true
+```
+
+The API key can be sent via:
+- Header: `Authorization: Bearer <key>` or `Authorization: <key>`
+- Query parameter: `?api_key=<key>`
+- Form data: `api_key=<key>`
+- JSON body: `{"api_key": "<key>"}`
+
+**Deployment:**
+
+For Railway deployment, the `railway.toml` is already configured. Set environment variables in Railway:
+- `CHANDRA_API_KEY` (optional, for authentication)
+- `CHANDRA_REQUIRE_API_KEY=true` (optional, to enable auth)
+- `PORT` (automatically set by Railway)
+
 ### vLLM Server (Optional)
 
 For production deployments or batch processing, use the vLLM server:
@@ -156,6 +192,10 @@ MAX_OUTPUT_TOKENS=8192
 VLLM_API_BASE=http://localhost:8000/v1
 VLLM_MODEL_NAME=chandra
 VLLM_GPUS=0
+
+# API authentication (optional)
+CHANDRA_API_KEY=your_secret_key_here
+CHANDRA_REQUIRE_API_KEY=false
 ```
 
 # Commercial usage
