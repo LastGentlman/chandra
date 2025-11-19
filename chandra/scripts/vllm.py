@@ -19,7 +19,7 @@ def main():
         "--env",
         "VLLM_ATTENTION_BACKEND=TORCH_SDPA",
         "-p",
-        "8000:8000",
+        "5000:8000",
         "--ipc=host",
         "vllm/vllm-openai:latest",
         "--model",
