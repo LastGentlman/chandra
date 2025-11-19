@@ -13,8 +13,8 @@ from chandra.output import parse_layout
 
 
 @st.cache_resource()
-def load_model(method: str):
-    return InferenceManager(method=method)
+def load_model():
+    return InferenceManager()
 
 
 @st.cache_data()
@@ -73,20 +73,8 @@ st.markdown("""
 This app will let you try chandra, a layout-aware vision language model.
 """)
 
-# Get model mode selection
-model_mode = st.sidebar.selectbox(
-    "Model Mode",
-    ["None", "hf", "vllm"],
-    index=0,
-    help="Select how to run inference: hf loads the model in memory using huggingface transformers, vllm connects to a running vLLM server.",
-)
-
-# Only load model if a mode is selected
-model = None
-if model_mode == "None":
-    st.warning("Please select a model mode (Local Model or vLLM Server) to run OCR.")
-else:
-    model = load_model(model_mode)
+# Load local model once
+model = load_model()
 
 in_file = st.sidebar.file_uploader(
     "PDF file or image:", type=["pdf", "png", "jpg", "jpeg", "gif", "webp"]
@@ -114,40 +102,37 @@ if pil_image is None:
     st.stop()
 
 if run_ocr:
-    if model_mode == "None":
-        st.error("Please select a model mode (hf or vllm) to run OCR.")
-    else:
-        result, layout_image = ocr_layout(
-            pil_image,
-            model,
+    result, layout_image = ocr_layout(
+        pil_image,
+        model,
+    )
+
+    # Embed images as base64 data URLs in the markdown
+    markdown_with_images = embed_images_in_markdown(result.markdown, result.images)
+
+    with col1:
+        html_tab, text_tab, layout_tab = st.tabs(
+            ["HTML", "HTML as text", "Layout Image"]
         )
-
-        # Embed images as base64 data URLs in the markdown
-        markdown_with_images = embed_images_in_markdown(result.markdown, result.images)
-
-        with col1:
-            html_tab, text_tab, layout_tab = st.tabs(
-                ["HTML", "HTML as text", "Layout Image"]
+        with html_tab:
+            st.markdown(markdown_with_images, unsafe_allow_html=True)
+            st.download_button(
+                label="Download Markdown",
+                data=result.markdown,
+                file_name=f"{in_file.name.rsplit('.', 1)[0]}_page{page_number if page_number is not None else 0}.md",
+                mime="text/markdown",
             )
-            with html_tab:
-                st.markdown(markdown_with_images, unsafe_allow_html=True)
-                st.download_button(
-                    label="Download Markdown",
-                    data=result.markdown,
-                    file_name=f"{in_file.name.rsplit('.', 1)[0]}_page{page_number if page_number is not None else 0}.md",
-                    mime="text/markdown",
-                )
-            with text_tab:
-                st.text(result.html)
+        with text_tab:
+            st.text(result.html)
 
-            if layout_image:
-                with layout_tab:
-                    st.image(
-                        layout_image,
-                        caption="Detected Layout",
-                        use_container_width=True,
-                    )
-                    st.text_area(result.raw)
+        if layout_image:
+            with layout_tab:
+                st.image(
+                    layout_image,
+                    caption="Detected Layout",
+                    use_container_width=True,
+                )
+                st.text_area(result.raw)
 
 with col2:
     st.image(pil_image, caption="Uploaded Image", use_container_width=True)

@@ -2,7 +2,7 @@ from chandra.model import InferenceManager, BatchInputItem
 
 
 def test_inference_image(simple_text_image):
-    manager = InferenceManager(method="hf")
+    manager = InferenceManager()
     batch = [
         BatchInputItem(
             image=simple_text_image,

@@ -46,7 +46,6 @@ Procesa un archivo (imagen o PDF) y devuelve el texto extraído en formato Markd
 | Parámetro | Tipo | Requerido | Default | Descripción |
 |-----------|------|-----------|---------|-------------|
 | `file` | file | Sí | - | Archivo a procesar (imagen o PDF) |
-| `method` | string | No | "vllm" | Método de inferencia: "hf" o "vllm" |
 | `include_images` | string | No | "true" | Incluir imágenes extraídas: "true" o "false" |
 | `include_headers_footers` | string | No | "false" | Incluir headers/footers: "true" o "false" |
 | `max_output_tokens` | integer | No | - | Máximo de tokens de salida por página |
@@ -56,7 +55,6 @@ Procesa un archivo (imagen o PDF) y devuelve el texto extraído en formato Markd
 ```bash
 curl -X POST http://localhost:5000/api/ocr \
   -F "file=@documento.pdf" \
-  -F "method=vllm" \
   -F "include_images=true"
 ```
 
@@ -67,7 +65,6 @@ import requests
 url = "http://localhost:5000/api/ocr"
 files = {"file": open("documento.pdf", "rb")}
 data = {
-    "method": "vllm",
     "include_images": "true",
     "include_headers_footers": "false"
 }
@@ -109,7 +106,6 @@ print(result["chunks"])    # Bloques con bbox y labels
         "page_box": [0, 0, 1920, 1080]
       }
     ],
-    "method": "vllm",
     "include_images": true,
     "include_headers_footers": false
   }
@@ -129,7 +125,6 @@ Procesa una imagen directamente desde una cadena base64 (útil para bots que rec
 ```json
 {
   "image_base64": "data:image/png;base64,iVBORw0KGgo...",
-  "method": "vllm",
   "include_images": true,
   "include_headers_footers": false,
   "max_output_tokens": 8192
@@ -141,8 +136,7 @@ Procesa una imagen directamente desde una cadena base64 (útil para bots que rec
 curl -X POST http://localhost:5000/api/ocr/image \
   -H "Content-Type: application/json" \
   -d '{
-    "image_base64": "data:image/png;base64,...",
-    "method": "vllm"
+    "image_base64": "data:image/png;base64,..."
   }'
 ```
 
@@ -159,7 +153,6 @@ with open("imagen.png", "rb") as f:
 url = "http://localhost:5000/api/ocr/image"
 payload = {
     "image_base64": image_data,
-    "method": "vllm",
     "include_images": True
 }
 
@@ -201,7 +194,7 @@ def process_image_with_chandra(image_url):
     # Procesar con Chandra
     response = requests.post(
         CHANDRA_API_URL,
-        json={"image_base64": image_data, "method": "vllm"}
+        json={"image_base64": image_data}
     )
     
     if response.status_code == 200:
@@ -258,7 +251,6 @@ if __name__ == "__main__":
 ## Notas
 
 - El modelo se carga en memoria la primera vez que se usa (caché global)
-- Para usar el método "hf", asegúrate de tener el modelo descargado
-- Para usar el método "vllm", necesitas tener un servidor vLLM corriendo (ver README.md)
+- Asegúrate de tener el checkpoint descargado y una GPU configurada para acelerar la inferencia local
 - Las imágenes extraídas se devuelven en formato base64 para facilitar el uso en APIs
 

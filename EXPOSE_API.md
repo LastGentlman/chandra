@@ -139,7 +139,7 @@ CHANDRA_API_URL = "https://chandra-api.tu-dominio.com"  # O la URL del túnel
 # Usar la API
 response = requests.post(
     f"{CHANDRA_API_URL}/api/ocr/image",
-    json={"image_base64": image_data, "method": "vllm"}
+    json={"image_base64": image_data}
 )
 ```
 

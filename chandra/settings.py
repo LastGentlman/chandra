@@ -17,13 +17,6 @@ class Settings(BaseSettings):
     TORCH_ATTN: str | None = None
     BBOX_SCALE: int = 1024
 
-    # vLLM server settings
-    VLLM_API_KEY: str = "EMPTY"
-    VLLM_API_BASE: str = "http://localhost:8000/v1"
-    VLLM_MODEL_NAME: str = "chandra"
-    VLLM_GPUS: str = "0"
-    MAX_VLLM_RETRIES: int = 6
-
     @computed_field
     @property
     def TORCH_DTYPE(self) -> torch.dtype:

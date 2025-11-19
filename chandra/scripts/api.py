@@ -21,7 +21,7 @@ from chandra.input import load_file
 app = Flask(__name__)
 
 # Variable global para el modelo (se inicializa en el primer uso)
-_model_cache = {}
+_model_cache: Optional[InferenceManager] = None
 
 
 # Configurar CORS para permitir acceso desde cualquier origen
@@ -45,11 +45,12 @@ def handle_preflight():
         return response
 
 
-def get_model(method: str = "vllm") -> InferenceManager:
+def get_model() -> InferenceManager:
     """Obtiene o crea el modelo de inferencia (con caché)"""
-    if method not in _model_cache:
-        _model_cache[method] = InferenceManager(method=method)
-    return _model_cache[method]
+    global _model_cache
+    if _model_cache is None:
+        _model_cache = InferenceManager()
+    return _model_cache
 
 
 def image_to_base64(pil_image: Image.Image, format: str = "PNG") -> str:
@@ -81,7 +82,6 @@ def ocr():
     
     Parámetros (form-data):
     - file: archivo (imagen o PDF)
-    - method: "hf" o "vllm" (default: "vllm")
     - include_images: "true" o "false" (default: "true")
     - include_headers_footers: "true" o "false" (default: "false")
     - max_output_tokens: número entero (opcional)
@@ -104,10 +104,6 @@ def ocr():
             return jsonify({"error": "Empty filename"}), 400
 
         # Obtener parámetros opcionales
-        method = request.form.get("method", "vllm").lower()
-        if method not in ["hf", "vllm"]:
-            return jsonify({"error": "method must be 'hf' or 'vllm'"}), 400
-
         include_images = request.form.get("include_images", "true").lower() == "true"
         include_headers_footers = request.form.get("include_headers_footers", "false").lower() == "true"
         
@@ -133,7 +129,7 @@ def ocr():
                 return jsonify({"error": "No images could be loaded from file"}), 400
 
             # Obtener modelo
-            model = get_model(method)
+            model = get_model()
 
             # Procesar todas las páginas
             all_results = []
@@ -196,7 +192,6 @@ def ocr():
                     "total_chunks": len(all_chunks),
                     "total_images": len(all_extracted_images),
                     "pages": page_metadata,
-                    "method": method,
                     "include_images": include_images,
                     "include_headers_footers": include_headers_footers,
                 }
@@ -218,13 +213,12 @@ def ocr_image():
     """
     Endpoint simplificado para procesar una imagen directamente desde base64
     
-    Body JSON:
-    {
-        "image_base64": "data:image/png;base64,...",
-        "method": "vllm",
-        "include_images": true,
-        "include_headers_footers": false
-    }
+      Body JSON:
+      {
+          "image_base64": "data:image/png;base64,...",
+          "include_images": true,
+          "include_headers_footers": false
+      }
     """
     try:
         data = request.get_json()
@@ -241,13 +235,12 @@ def ocr_image():
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
         # Obtener parámetros
-        method = data.get("method", "vllm").lower()
         include_images = data.get("include_images", True)
         include_headers_footers = data.get("include_headers_footers", False)
         max_output_tokens = data.get("max_output_tokens")
 
         # Obtener modelo
-        model = get_model(method)
+        model = get_model()
 
         # Procesar
         batch = [BatchInputItem(image=image, prompt_type="ocr_layout")]
@@ -276,8 +269,7 @@ def ocr_image():
                 "num_chunks": len(result.chunks),
                 "num_images": len(result.images),
                 "page_box": result.page_box,
-                "method": method,
-            }
+            },
         }
 
         return jsonify(response)

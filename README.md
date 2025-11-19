@@ -10,7 +10,7 @@ Chandra is a highly accurate OCR model that converts images and PDFs into struct
 - Good support for tables, math, and complex layouts
 - Extracts images and diagrams, with captions and structured data
 - Support for 40+ languages
-- Two inference modes: local (HuggingFace) and remote (vLLM server)
+- Local HuggingFace-based inference with layout-aware markdown output
 
 ## Hosted API
 
@@ -24,12 +24,8 @@ The easiest way to start is with the CLI tools:
 ```shell
 pip install chandra-ocr
 
-# With VLLM
-chandra_vllm
+# Process a PDF or image directory
 chandra input.pdf ./output
-
-# With HuggingFace
-chandra input.pdf ./output --method hf
 
 # Interactive streamlit app
 chandra_app
@@ -95,18 +91,16 @@ source .venv/bin/activate
 Process single files or entire directories:
 
 ```bash
-# Single file, with vllm server (see below for how to launch vllm)
-chandra input.pdf ./output --method vllm
+# Process a single PDF or image into ./output
+chandra input.pdf ./output
 
-# Process all files in a directory with local model
-chandra ./documents ./output --method hf
+# Process all files in a directory
+chandra ./documents ./output
 ```
 
 **CLI Options:**
-- `--method [hf|vllm]`: Inference method (default: vllm)
 - `--page-range TEXT`: Page range for PDFs (e.g., "1-5,7,9-12")
 - `--max-output-tokens INTEGER`: Max tokens per page
-- `--max-workers INTEGER`: Parallel workers for vLLM
 - `--include-images/--no-images`: Extract and save images (default: include)
 - `--include-headers-footers/--no-headers-footers`: Include page headers/footers (default: exclude)
 - `--batch-size INTEGER`: Pages per batch (default: 1)
@@ -127,22 +121,6 @@ Launch the interactive demo for single-page processing:
 chandra_app
 ```
 
-### vLLM Server (Optional)
-
-For production deployments or batch processing, use the vLLM server:
-
-```bash
-chandra_vllm
-```
-
-This launches a Docker container with optimized inference settings. Configure via environment variables:
-
-- `VLLM_API_BASE`: Server URL (default: `http://localhost:8000/v1`)
-- `VLLM_MODEL_NAME`: Model name for the server (default: `chandra`)
-- `VLLM_GPUS`: GPU device IDs (default: `0`)
-
-You can also start your own vllm server with the `datalab-to/chandra` model.
-
 ### Configuration
 
 Settings can be configured via environment variables or a `local.env` file:
@@ -152,30 +130,10 @@ Settings can be configured via environment variables or a `local.env` file:
 MODEL_CHECKPOINT=datalab-to/chandra
 MAX_OUTPUT_TOKENS=8192
 
-# vLLM settings
-VLLM_API_BASE=http://localhost:8000/v1
-VLLM_MODEL_NAME=chandra
-VLLM_GPUS=0
+# Local GPU settings
+TORCH_DEVICE=cuda
+TORCH_ATTN=sdpa
 ```
-
-### Railway Deployment (API + Local GPU)
-
-Deploy the lightweight HTTP API on Railway while keeping the GPU-heavy vLLM server on your own machine (or any other GPU host):
-
-1. **Run inference where you have GPU access**  
-   Launch `chandra_vllm` (or `python -m chandra.scripts.vllm`) on your GPU box and expose it with Cloudflare Tunnel or any secure reverse proxy. Note the public URL (e.g. `https://tu-tunel.cloudflareclient.com/v1`).
-
-2. **Deploy the API on Railway**  
-   - Railway reads `railway.toml` and will run `python -m chandra.scripts.run_api`, automatically binding to the provided `$PORT`.  
-   - Set the following Railway variables so the API knows how to reach your remote vLLM server:
-     - `VLLM_API_BASE` → URL of your tunnel/public endpoint  
-     - `VLLM_API_KEY` → token if your tunnel or server requires one (`EMPTY` otherwise)  
-     - Optional: `MODEL_CHECKPOINT`, `MAX_OUTPUT_TOKENS`, `TORCH_DEVICE=cpu`, `TORCH_ATTN`, `BBOX_SCALE`, `IMAGE_DPI`, `MIN_PDF_IMAGE_DIM`, `MIN_IMAGE_DIM` to mirror your `local.env` defaults.
-
-3. **Test the flow**  
-   From your laptop or bot, call the Railway URL (`https://<app>.up.railway.app/api/ocr`). Railway forwards the request to your GPU-backed vLLM server, which returns the OCR output without exposing your home network directly.
-
-This split keeps GPU costs off Railway while still providing a stable, internet-facing API endpoint.
 
 # Commercial usage
 
@@ -201,6 +159,5 @@ This code is Apache 2.0, and our model weights use a modified OpenRAIL-M license
 Thank you to the following open source projects:
 
 - [Huggingface Transformers](https://github.com/huggingface/transformers)
-- [VLLM](https://github.com/vllm-project/vllm)
 - [olmocr](github.com/allenai/olmocr)
 - [Qwen 3 VL](https://github.com/QwenLM/Qwen3)

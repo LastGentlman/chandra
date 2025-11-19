@@ -11,13 +11,12 @@ from pathlib import Path
 API_URL = "http://localhost:5000"
 
 
-def process_file(file_path: str, method: str = "vllm") -> dict:
+def process_file(file_path: str) -> dict:
     """
     Procesa un archivo (imagen o PDF) usando la API de Chandra
     
     Args:
         file_path: Ruta al archivo a procesar
-        method: Método de inferencia ("hf" o "vllm")
     
     Returns:
         Diccionario con los resultados (markdown, html, chunks, etc.)
@@ -27,7 +26,6 @@ def process_file(file_path: str, method: str = "vllm") -> dict:
     with open(file_path, "rb") as f:
         files = {"file": (Path(file_path).name, f, "application/octet-stream")}
         data = {
-            "method": method,
             "include_images": "true",
             "include_headers_footers": "false"
         }
@@ -38,13 +36,12 @@ def process_file(file_path: str, method: str = "vllm") -> dict:
         return response.json()
 
 
-def process_image_base64(image_base64: str, method: str = "vllm") -> dict:
+def process_image_base64(image_base64: str) -> dict:
     """
     Procesa una imagen desde base64 usando la API de Chandra
     
     Args:
         image_base64: Imagen en formato base64 (con o sin prefijo data:image/...)
-        method: Método de inferencia ("hf" o "vllm")
     
     Returns:
         Diccionario con los resultados
@@ -57,7 +54,6 @@ def process_image_base64(image_base64: str, method: str = "vllm") -> dict:
     
     payload = {
         "image_base64": image_base64,
-        "method": method,
         "include_images": True,
         "include_headers_footers": False
     }
@@ -68,13 +64,12 @@ def process_image_base64(image_base64: str, method: str = "vllm") -> dict:
     return response.json()
 
 
-def process_image_file(image_path: str, method: str = "vllm") -> dict:
+def process_image_file(image_path: str) -> dict:
     """
     Procesa un archivo de imagen convirtiéndolo a base64 primero
     
     Args:
         image_path: Ruta al archivo de imagen
-        method: Método de inferencia ("hf" o "vllm")
     
     Returns:
         Diccionario con los resultados
@@ -95,7 +90,7 @@ def process_image_file(image_path: str, method: str = "vllm") -> dict:
         
         image_data = f"data:image/{mime_type};base64,{image_base64}"
         
-        return process_image_base64(image_data, method)
+        return process_image_base64(image_data)
 
 
 # Ejemplo de uso
@@ -112,14 +107,14 @@ if __name__ == "__main__":
     # Ejemplo 1: Procesar un archivo
     print("\n=== Ejemplo 1: Procesar archivo ===")
     # Descomenta y ajusta la ruta a tu archivo
-    # result = process_file("ejemplo.pdf", method="vllm")
+    # result = process_file("ejemplo.pdf")
     # print(f"Markdown:\n{result['markdown'][:500]}...")
     # print(f"\nMetadata: {result['metadata']}")
     
     # Ejemplo 2: Procesar imagen desde archivo
     print("\n=== Ejemplo 2: Procesar imagen ===")
     # Descomenta y ajusta la ruta a tu imagen
-    # result = process_image_file("ejemplo.png", method="vllm")
+    # result = process_image_file("ejemplo.png")
     # print(f"Markdown:\n{result['markdown'][:500]}...")
     # print(f"\nChunks encontrados: {len(result['chunks'])}")
     

@@ -125,12 +125,6 @@ def save_merged_output(
 @click.argument("input_path", type=click.Path(exists=True, path_type=Path))
 @click.argument("output_path", type=click.Path(path_type=Path))
 @click.option(
-    "--method",
-    type=click.Choice(["hf", "vllm"], case_sensitive=False),
-    default="vllm",
-    help="Inference method: 'hf' for local model, 'vllm' for vLLM server.",
-)
-@click.option(
     "--page-range",
     type=str,
     default=None,
@@ -141,18 +135,6 @@ def save_merged_output(
     type=int,
     default=None,
     help="Maximum number of output tokens per page.",
-)
-@click.option(
-    "--max-workers",
-    type=int,
-    default=None,
-    help="Maximum number of parallel workers for vLLM inference.",
-)
-@click.option(
-    "--max-retries",
-    type=int,
-    default=None,
-    help="Maximum number of retries for vLLM inference.",
 )
 @click.option(
     "--include-images/--no-images",
@@ -183,38 +165,27 @@ def save_merged_output(
 def main(
     input_path: Path,
     output_path: Path,
-    method: str,
     page_range: str,
     max_output_tokens: int,
-    max_workers: int,
-    max_retries: int,
     include_images: bool,
     include_headers_footers: bool,
     save_html: bool,
     batch_size: int,
     paginate_output: bool,
 ):
-    if method == "hf":
-        click.echo(
-            "When using '--method hf', ensure that the batch size is set correctly.  We will default to batch size of 1."
-        )
-        if batch_size is None:
-            batch_size = 1
-    elif method == "vllm":
-        if batch_size is None:
-            batch_size = 28
+    if batch_size is None or batch_size < 1:
+        batch_size = 1
 
     click.echo("Chandra CLI - Starting OCR processing")
     click.echo(f"Input: {input_path}")
     click.echo(f"Output: {output_path}")
-    click.echo(f"Method: {method}")
 
     # Create output directory
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Load model
-    click.echo(f"\nLoading model with method '{method}'...")
-    model = InferenceManager(method=method)
+    click.echo("\nLoading local model...")
+    model = InferenceManager()
     click.echo("Model loaded successfully.")
 
     # Get files to process
@@ -262,12 +233,6 @@ def main(
 
                 if max_output_tokens is not None:
                     generate_kwargs["max_output_tokens"] = max_output_tokens
-
-                if method == "vllm":
-                    if max_workers is not None:
-                        generate_kwargs["max_workers"] = max_workers
-                    if max_retries is not None:
-                        generate_kwargs["max_retries"] = max_retries
 
                 results = model.generate(batch, **generate_kwargs)
                 all_results.extend(results)

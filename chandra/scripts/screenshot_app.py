@@ -22,7 +22,7 @@ model = None
 def get_model():
     global model
     if model is None:
-        model = InferenceManager(method="vllm")
+        model = InferenceManager()
     return model
 
 
