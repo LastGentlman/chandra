@@ -35,14 +35,16 @@ def process_image_file(image_path):
     url = f"{API_URL}/api/ocr"
     with open(image_path, "rb") as f:
         files = {"file": f}
-        response = requests.post(url, files=files)
+        data = {"method": "vllm"}
+        response = requests.post(url, files=files, data=data)
         return response.json()
 
 # Opción B: Procesar imagen desde base64 (útil para bots)
 def process_image_base64(image_base64):
     url = f"{API_URL}/api/ocr/image"
     payload = {
-        "image_base64": image_base64
+        "image_base64": image_base64,
+        "method": "vllm"
     }
     response = requests.post(url, json=payload)
     return response.json()
@@ -65,9 +67,10 @@ async function processImage(imageBase64) {
         headers: {
             'Content-Type': 'application/json',
         },
-            body: JSON.stringify({
-                image_base64: imageBase64
-            })
+        body: JSON.stringify({
+            image_base64: imageBase64,
+            method: "vllm"
+        })
     });
     
     return await response.json();
@@ -86,12 +89,13 @@ curl http://192.168.1.57:5000/api/health
 
 # Procesar archivo
 curl -X POST http://192.168.1.57:5000/api/ocr \
-  -F "file=@imagen.png"
+  -F "file=@imagen.png" \
+  -F "method=vllm"
 
 # Procesar imagen base64
 curl -X POST http://192.168.1.57:5000/api/ocr/image \
   -H "Content-Type: application/json" \
-  -d '{"image_base64": "data:image/png;base64,..."}'
+  -d '{"image_base64": "data:image/png;base64,...", "method": "vllm"}'
 ```
 
 ## Ejemplo completo: Bot de Telegram
@@ -124,7 +128,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         response = requests.post(
             CHANDRA_API_URL,
-            json={"image_base64": image_data},
+            json={"image_base64": image_data, "method": "vllm"},
             timeout=60
         )
         response.raise_for_status()

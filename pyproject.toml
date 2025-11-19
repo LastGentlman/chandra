@@ -15,6 +15,7 @@ dependencies = [
     "filetype>=1.2.0",
     "flask>=3.0.0",
     "markdownify==1.1.0",
+    "openai>=2.2.0",
     "pillow>=10.2.0",
     "pydantic>=2.12.0",
     "pydantic-settings>=2.11.0",
@@ -37,6 +38,7 @@ chandra = "chandra.scripts.cli:main"
 chandra_app = "chandra.scripts.run_app:main"
 chandra_api = "chandra.scripts.run_api:main"
 chandra_screenshot = "chandra.scripts.screenshot_app:main"
+chandra_vllm = "chandra.scripts.vllm:main"
 
 [tool.setuptools.packages.find]
 include = ["chandra*"]
