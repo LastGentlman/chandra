@@ -198,6 +198,25 @@ CHANDRA_API_KEY=your_secret_key_here
 CHANDRA_REQUIRE_API_KEY=false
 ```
 
+### Railway Deployment (API + Local GPU)
+
+Deploy the lightweight HTTP API on Railway while keeping the GPU-heavy vLLM server on your own machine (or any other GPU host):
+
+1. **Run inference where you have GPU access**  
+   Launch `chandra_vllm` (or `python -m chandra.scripts.vllm`) on your GPU box and expose it with Cloudflare Tunnel or any secure reverse proxy. Note the public URL (e.g. `https://tu-tunel.cloudflareclient.com/v1`).
+
+2. **Deploy the API on Railway**  
+   - Railway reads `railway.toml` and will run `python -m chandra.scripts.run_api`, automatically binding to the provided `$PORT`.  
+   - Set the following Railway variables so the API knows how to reach your remote vLLM server:
+     - `VLLM_API_BASE` → URL of your tunnel/public endpoint  
+     - `VLLM_API_KEY` → token if your tunnel or server requires one (`EMPTY` otherwise)  
+     - Optional: `MODEL_CHECKPOINT`, `MAX_OUTPUT_TOKENS`, `TORCH_DEVICE=cpu`, `TORCH_ATTN`, `BBOX_SCALE`, `IMAGE_DPI`, `MIN_PDF_IMAGE_DIM`, `MIN_IMAGE_DIM` to mirror your `local.env` defaults.
+
+3. **Test the flow**  
+   From your laptop or bot, call the Railway URL (`https://<app>.up.railway.app/api/ocr`). Railway forwards the request to your GPU-backed vLLM server, which returns the OCR output without exposing your home network directly.
+
+This split keeps GPU costs off Railway while still providing a stable, internet-facing API endpoint.
+
 # Commercial usage
 
 This code is Apache 2.0, and our model weights use a modified OpenRAIL-M license (free for research, personal use, and startups under $2M funding/revenue, cannot be used competitively with our API). To remove the OpenRAIL license requirements, or for broader commercial licensing, visit our pricing page [here](https://www.datalab.to/pricing?utm_source=gh-chandra).
