@@ -89,7 +89,11 @@ fi
 
 # Iniciar Cloudflare Tunnel
 echo "🌐 Iniciando Cloudflare Tunnel..."
-echo "📋 vLLM estará disponible en: https://chandra-vllm.ingroy.com/v1"
+if [ -n "$PUBLIC_VLLM_URL" ]; then
+    echo "📋 vLLM estará disponible en: $PUBLIC_VLLM_URL"
+else
+    echo "📋 Define PUBLIC_VLLM_URL para mostrar la URL pública que expone tu túnel (ej: https://tunnel.midominio.com/v1)"
+fi
 echo "   (El túnel ya está configurado para exponer el puerto 5000)"
 echo ""
 

@@ -4,13 +4,14 @@ Permite procesar imágenes y PDFs mediante endpoints HTTP
 """
 import base64
 import io
-import json
 import os
+import tempfile
+from http import HTTPStatus
 from pathlib import Path
 from typing import Optional
 
 from flask import Flask, request, jsonify
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import filetype
 
 from chandra.model import InferenceManager
@@ -19,20 +20,97 @@ from chandra.input import load_file
 from chandra.settings import settings
 
 
+# Limitar tamaño máximo de imágenes para prevenir ataques zip bomb
+Image.MAX_IMAGE_PIXELS = settings.MAX_IMAGE_PIXELS
+
 app = Flask(__name__)
 
 # Variable global para el modelo (se inicializa en el primer uso)
 _model_cache = {}
 
 
-# Configurar CORS para permitir acceso desde cualquier origen
+def _normalize_origin(origin: str) -> str:
+    return origin.rstrip("/")
+
+
+def _parse_allowed_origins(raw_origins: str) -> set[str]:
+    if not raw_origins:
+        return {"*"}
+    origins = {
+        _normalize_origin(origin.strip())
+        for origin in raw_origins.split(",")
+        if origin.strip()
+    }
+    return origins or {"*"}
+
+
+ALLOWED_ORIGINS = _parse_allowed_origins(settings.CHANDRA_ALLOWED_ORIGINS)
+
+
+def _is_origin_allowed(origin: Optional[str]) -> bool:
+    if "*" in ALLOWED_ORIGINS:
+        return True
+    if not origin:
+        # Permitir llamadas server-to-server sin header Origin
+        return True
+    return _normalize_origin(origin) in ALLOWED_ORIGINS
+
+
+def _get_cors_origin(origin: Optional[str]) -> Optional[str]:
+    if "*" in ALLOWED_ORIGINS:
+        return "*"
+    if origin and _normalize_origin(origin) in ALLOWED_ORIGINS:
+        return origin
+    return None
+
+
+def _apply_cors_headers(response):
+    origin_header = request.headers.get("Origin")
+    allowed_origin = _get_cors_origin(origin_header)
+    if allowed_origin:
+        response.headers["Access-Control-Allow-Origin"] = allowed_origin
+        if allowed_origin != "*":
+            response.headers.add("Vary", "Origin")
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    response.headers["Access-Control-Max-Age"] = "3600"
+    return response
+
+
+def _validate_upload_size(size_in_bytes: Optional[int]) -> bool:
+    if size_in_bytes is None:
+        return True
+    return size_in_bytes <= settings.MAX_UPLOAD_BYTES
+
+
+def _validate_uploaded_file(path: Path, original_name: str) -> tuple[bool, Optional[str]]:
+    """Verifica que el archivo subido sea de un tipo permitido"""
+    extension = Path(original_name).suffix.lower()
+    extension_allowed = extension in settings.ALLOWED_FILE_EXTENSIONS
+
+    guessed = filetype.guess(str(path))
+    if guessed and guessed.mime not in settings.ALLOWED_FILE_MIME_TYPES:
+        return (
+            False,
+            f"Unsupported file type: {guessed.mime}. Allowed types: "
+            + ", ".join(settings.ALLOWED_FILE_MIME_TYPES),
+        )
+
+    if not extension_allowed:
+        if not guessed or guessed.mime not in settings.ALLOWED_FILE_MIME_TYPES:
+            return (
+                False,
+                "Unsupported file type. Allowed extensions: "
+                + ", ".join(settings.ALLOWED_FILE_EXTENSIONS),
+            )
+
+    return True, None
+
+
 @app.after_request
 def after_request(response):
     """Agrega headers CORS a todas las respuestas"""
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-    return response
+    return _apply_cors_headers(response)
 
 
 def verify_api_key():
@@ -45,9 +123,16 @@ def verify_api_key():
     if not settings.CHANDRA_REQUIRE_API_KEY:
         return None
     
-    # Si se requiere pero no está configurada, permitir acceso (modo desarrollo)
+    # Si se requiere pero no está configurada, fallar
     if not settings.CHANDRA_API_KEY:
-        return None
+        return (
+            jsonify(
+                {
+                    "error": "API key enforcement is enabled but CHANDRA_API_KEY is not configured"
+                }
+            ),
+            HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
     
     # Obtener API key del header Authorization o del parámetro api_key
     api_key = None
@@ -71,7 +156,7 @@ def verify_api_key():
     
     # Verificar la clave
     if not api_key or api_key != settings.CHANDRA_API_KEY:
-        return jsonify({"error": "Invalid or missing API key"}), 401
+        return jsonify({"error": "Invalid or missing API key"}), HTTPStatus.UNAUTHORIZED
     
     return None
 
@@ -80,11 +165,13 @@ def verify_api_key():
 def handle_preflight():
     """Maneja las peticiones OPTIONS (preflight) de CORS"""
     if request.method == "OPTIONS":
+        if not _is_origin_allowed(request.headers.get("Origin")):
+            return jsonify({"error": "Origin not allowed"}), HTTPStatus.FORBIDDEN
         response = jsonify({})
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
-        return response
+        return _apply_cors_headers(response)
+
+    if not _is_origin_allowed(request.headers.get("Origin")):
+        return jsonify({"error": "Origin not allowed"}), HTTPStatus.FORBIDDEN
     
     # Verificar API key antes de procesar la petición
     api_key_error = verify_api_key()
@@ -167,9 +254,46 @@ def ocr():
         
         page_range = request.form.get("page_range", None)
 
-        # Guardar archivo temporalmente
-        temp_path = Path("/tmp") / file.filename
+        content_length = request.content_length
+        if not _validate_upload_size(content_length):
+            return (
+                jsonify(
+                    {
+                        "error": f"File too large. Maximum allowed size is {settings.MAX_UPLOAD_MB} MB"
+                    }
+                ),
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+
+        temp_path: Optional[Path] = None
+
+        # Guardar archivo temporalmente con un nombre seguro
+        suffix = Path(file.filename).suffix if file.filename else ""
+        if not suffix:
+            suffix = ".upload"
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+            temp_path = Path(tmp_file.name)
+
         file.save(str(temp_path))
+
+        # Validar tamaño real
+        if not _validate_upload_size(temp_path.stat().st_size):
+            temp_path.unlink(missing_ok=True)
+            return (
+                jsonify(
+                    {
+                        "error": f"File too large. Maximum allowed size is {settings.MAX_UPLOAD_MB} MB"
+                    }
+                ),
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+
+        # Validar tipo de archivo
+        is_valid_file, file_error = _validate_uploaded_file(temp_path, file.filename)
+        if not is_valid_file:
+            temp_path.unlink(missing_ok=True)
+            return jsonify({"error": file_error}), HTTPStatus.BAD_REQUEST
 
         try:
             # Cargar imágenes del archivo
@@ -253,7 +377,7 @@ def ocr():
 
         finally:
             # Limpiar archivo temporal
-            if temp_path.exists():
+            if temp_path and temp_path.exists():
                 temp_path.unlink()
 
     except Exception as e:
@@ -274,7 +398,7 @@ def ocr_image():
     }
     """
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data or "image_base64" not in data:
             return jsonify({"error": "image_base64 is required"}), 400
 
@@ -285,13 +409,44 @@ def ocr_image():
             image_data = image_data.split(",")[1]
         
         image_bytes = base64.b64decode(image_data)
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+
+        if not _validate_upload_size(len(image_bytes)):
+            return (
+                jsonify(
+                    {
+                        "error": f"Image payload too large. Maximum allowed size is {settings.MAX_UPLOAD_MB} MB"
+                    }
+                ),
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+            )
+
+        try:
+            image = Image.open(io.BytesIO(image_bytes))
+            image = image.convert("RGB")
+        except Image.DecompressionBombError as exc:
+            return (
+                jsonify({"error": f"Image is too large or suspicious: {exc}"}),
+                HTTPStatus.BAD_REQUEST,
+            )
+        except (UnidentifiedImageError, OSError) as exc:
+            return jsonify({"error": f"Invalid image payload: {exc}"}), HTTPStatus.BAD_REQUEST
 
         # Obtener parámetros
         method = data.get("method", "vllm").lower()
+        if method not in ["hf", "vllm"]:
+            return jsonify({"error": "method must be 'hf' or 'vllm'"}), HTTPStatus.BAD_REQUEST
+
         include_images = data.get("include_images", True)
         include_headers_footers = data.get("include_headers_footers", False)
         max_output_tokens = data.get("max_output_tokens")
+        if max_output_tokens is not None:
+            try:
+                max_output_tokens = int(max_output_tokens)
+            except (TypeError, ValueError):
+                return (
+                    jsonify({"error": "max_output_tokens must be an integer"}),
+                    HTTPStatus.BAD_REQUEST,
+                )
 
         # Obtener modelo
         model = get_model(method)
