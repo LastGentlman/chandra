@@ -1,125 +1,119 @@
 # Variables de Entorno - Resumen Completo
 
-## 📋 Resumen por Componente
+> ⚠️ **Nunca** publiques valores reales de tokens o API keys en repositorios, tickets o capturas. Usa `local.env` (ignorad@ por git) y administradores de secretos como Railway, Fly.io, Render o GitHub Actions Secrets.
 
-### 1. vLLM en tu PC (local) - `local.env`
+## 📋 Resumen por componente
+
+### 1. vLLM en tu PC (`local.env`)
 
 ```bash
-# Configuración de vLLM (para usar GPU local)
+# Configuración del servidor vLLM local
 VLLM_API_BASE=http://localhost:5000/v1
 VLLM_MODEL_NAME=chandra
-VLLM_GPUS=0  # Cambia si tienes múltiples GPUs (ej: "0,1" para GPU 0 y 1)
-VLLM_API_KEY=EMPTY
-```
+VLLM_GPUS=0                  # Ej: "0,1" para dos GPUs
+VLLM_API_KEY=EMPTY           # Sólo si tu túnel exige autenticación
 
-**Nota:** Estas variables están en `local.env` y se usan cuando ejecutas `chandra_vllm` localmente.
-
----
-
-### 2. API en Railway
-
-```bash
-# Conexión a vLLM (tu PC con GPU)
-VLLM_API_BASE=https://chandra-vllm.ingroy.com/v1
-VLLM_MODEL_NAME=chandra
-VLLM_API_KEY=EMPTY
-
-# Autenticación de la API
-CHANDRA_API_KEY=chandra_live_a8f7b9052593f7bb773f8d3cb4f893b3be56b5fd81f1013b6281feb36ed25d62
+# Autenticación / seguridad compartida con la API
+CHANDRA_API_KEY=<TU_CHANDRA_API_KEY>
 CHANDRA_REQUIRE_API_KEY=true
-
-# Puerto (Railway lo configura automáticamente)
-PORT=5000  # No necesitas configurarlo, Railway lo hace
+CHANDRA_ALLOWED_ORIGINS=http://localhost:3000
+CHANDRA_MAX_UPLOAD_MB=25
+CHANDRA_MAX_IMAGE_PIXELS=80000000
 ```
 
-**Importante:** 
-- `VLLM_API_BASE` debe apuntar a tu vLLM expuesto públicamente
-- `CHANDRA_API_KEY` debe ser la misma que uses en el bot
+Guarda el archivo como `local.env` (basado en `local.env.example`) para evitar exponer credenciales.
 
 ---
 
-### 3. Bot en Railway
+### 2. API en Railway (o cualquier PaaS)
 
 ```bash
-# Token de Telegram
-TELEGRAM_BOT_TOKEN=8503190770:AAG438RJS1diQ2SZlVythH15Lrwa1yR6mfA
+# Enlace hacia tu vLLM público (Cloudflare Tunnel, ngrok, etc.)
+VLLM_API_BASE=https://<tu-tunel-publico>.example.com/v1
+VLLM_MODEL_NAME=chandra
+VLLM_API_KEY=EMPTY                       # o el token del túnel si aplica
 
-# URL de la API (debe ser la URL pública de tu API en Railway)
-CHANDRA_API_URL=https://tu-api-en-railway.railway.app/api/ocr/image
-# O si tienes un dominio personalizado:
-# CHANDRA_API_URL=https://api.tu-dominio.com/api/ocr/image
+# Seguridad de la API HTTP
+CHANDRA_API_KEY=<TU_CHANDRA_API_KEY>
+CHANDRA_REQUIRE_API_KEY=true
+CHANDRA_ALLOWED_ORIGINS=https://app.midominio.com
+CHANDRA_MAX_UPLOAD_MB=25
+CHANDRA_MAX_IMAGE_PIXELS=80000000
 
-# API Key para autenticarse con la API (debe ser la MISMA que en la API)
-CHANDRA_API_KEY=chandra_live_a8f7b9052593f7bb773f8d3cb4f893b3be56b5fd81f1013b6281feb36ed25d62
+# Railway define PORT automáticamente; no lo hardcodees.
 ```
 
-**Importante:**
-- `CHANDRA_API_KEY` debe ser **exactamente la misma** que configuraste en la API
-- `CHANDRA_API_URL` debe ser la URL completa del endpoint de la API en Railway
+---
+
+### 3. Bot (Railway, Fly, etc.)
+
+```bash
+TELEGRAM_BOT_TOKEN=<TOKEN_DE_TELEGRAM>
+CHANDRA_API_URL=https://tu-api-en-railway.app/api/ocr/image
+CHANDRA_API_KEY=<TU_CHANDRA_API_KEY>     # Debe ser idéntica a la de la API
+```
+
+Nunca compartas el `TELEGRAM_BOT_TOKEN`; revoca y crea uno nuevo si llegó a filtrarse.
 
 ---
 
-## 🔑 Variables Críticas
+## 🔑 Variables críticas
 
-### CHANDRA_API_KEY
-- **Debe ser la misma** en:
-  - ✅ API en Railway
-  - ✅ Bot en Railway
-  - ✅ `local.env` (si pruebas localmente)
-
-### VLLM_API_BASE
-- **En tu PC (local.env):** `http://localhost:5000/v1`
-- **En Railway (API):** `https://chandra-vllm.ingroy.com/v1`
+- **`CHANDRA_API_KEY`**: clave simétrica para proteger tus endpoints. Usa valores largos, generados aleatoriamente y distintos por entorno. Debe coincidir en:
+  - API pública (Railway / servidor propio)
+  - Bot / integraciones
+  - Pruebas locales (`local.env`)
+- **`VLLM_API_BASE`**: endpoint del backend vLLM que realmente ejecuta la inferencia. Nunca dejes una URL pública sin autenticación adicional (túnel protegido, firewall, VPN, etc.).
 
 ---
 
-## ✅ Checklist de Configuración
+## ✅ Checklist rápido
 
-### En Railway - Servicio API:
-- [ ] `VLLM_API_BASE=https://chandra-vllm.ingroy.com/v1`
-- [ ] `VLLM_MODEL_NAME=chandra`
-- [ ] `VLLM_API_KEY=EMPTY`
-- [ ] `CHANDRA_API_KEY=chandra_live_a8f7b9052593f7bb773f8d3cb4f893b3be56b5fd81f1013b6281feb36ed25d62`
+**Servicio API (Railway)**
+- [ ] `VLLM_API_BASE=https://<tu-tunel-publico>.example.com/v1`
+- [ ] `CHANDRA_API_KEY=<token-generado>`
 - [ ] `CHANDRA_REQUIRE_API_KEY=true`
+- [ ] `CHANDRA_ALLOWED_ORIGINS=https://app.midominio.com`
+- [ ] `CHANDRA_MAX_UPLOAD_MB=25` (ajusta según tus límites)
 
-### En Railway - Servicio Bot:
-- [ ] `TELEGRAM_BOT_TOKEN=8503190770:AAG438RJS1diQ2SZlVythH15Lrwa1yR6mfA`
-- [ ] `CHANDRA_API_URL=https://tu-api-en-railway.railway.app/api/ocr/image`
-- [ ] `CHANDRA_API_KEY=chandra_live_a8f7b9052593f7bb773f8d3cb4f893b3be56b5fd81f1013b6281feb36ed25d62`
+**Servicio del Bot**
+- [ ] `TELEGRAM_BOT_TOKEN=<token de BotFather>`
+- [ ] `CHANDRA_API_URL=https://<tu-api>/api/ocr/image`
+- [ ] `CHANDRA_API_KEY=<mismo token que la API>`
 
-### En tu PC - local.env:
+**Entorno local (`local.env`)**
 - [ ] `VLLM_API_BASE=http://localhost:5000/v1`
-- [ ] `VLLM_MODEL_NAME=chandra`
-- [ ] `VLLM_GPUS=0`
-- [ ] `VLLM_API_KEY=EMPTY`
-- [ ] `CHANDRA_API_KEY=chandra_live_a8f7b9052593f7bb773f8d3cb4f893b3be56b5fd81f1013b6281feb36ed25d62`
-- [ ] `CHANDRA_REQUIRE_API_KEY=true`
+- [ ] `VLLM_GPUS=<ids disponibles>`
+- [ ] `CHANDRA_API_KEY=<token local>`
+- [ ] `CHANDRA_ALLOWED_ORIGINS=http://localhost:3000`
 
 ---
 
-## 🚨 Variables Opcionales
-
-Estas tienen valores por defecto, pero puedes configurarlas si necesitas:
+## 🚨 Variables y flags opcionales
 
 ```bash
-# Para la API
-HOST=0.0.0.0  # Por defecto
-DEBUG=false   # Por defecto
-PORT=5000     # Por defecto (Railway lo configura automáticamente)
+# API HTTP
+HOST=0.0.0.0          # default
+DEBUG=false           # nunca actives en producción
+PORT=5000             # gestionado por Railway/Fly
 
-# Para vLLM
-MAX_VLLM_RETRIES=6  # Por defecto
-MODEL_CHECKPOINT=datalab-to/chandra  # Por defecto
-MAX_OUTPUT_TOKENS=12384  # Por defecto
+# vLLM
+MAX_VLLM_RETRIES=6
+MODEL_CHECKPOINT=datalab-to/chandra
+MAX_OUTPUT_TOKENS=12384
 ```
+
+- `CHANDRA_ALLOWED_ORIGINS`: lista separada por comas de orígenes confiables (`https://app.midominio.com,https://panel.midominio.com`). Usa `*` sólo para desarrollo.
+- `CHANDRA_MAX_UPLOAD_MB`: controla el límite superior aceptado por los endpoints `/api/ocr` y `/api/ocr/image`.
+- `CHANDRA_MAX_IMAGE_PIXELS`: freno contra imágenes maliciosas/ZIP bombs.
 
 ---
 
-## 📝 Notas Importantes
+## 📝 Buenas prácticas
 
-1. **CHANDRA_API_KEY debe ser idéntica** en API y Bot
-2. **VLLM_API_BASE** en Railway debe apuntar a tu vLLM público
-3. **CHANDRA_API_URL** en el bot debe ser la URL completa del endpoint
-4. **PORT** en Railway se configura automáticamente, no necesitas configurarlo
-5. Si cambias `CHANDRA_API_KEY`, actualízala en todos los lugares
+1. **Gestiona secretos fuera del repositorio**: usa `local.env` (ignorado por git) y los paneles de secretos de Railway/Fly/docker compose.
+2. **Rotación**: ante cualquier sospecha, genera un nuevo `CHANDRA_API_KEY` o `TELEGRAM_BOT_TOKEN` y actualiza todos los servicios dependientes.
+3. **Principio de mínimo privilegio**: no reutilices el mismo token para distintos proyectos o bots.
+4. **Revisa el historial**: si un secreto se publicó por error, bórralo del historial (BFG/git filter-repo) y considera comprometerlo como expuesto permanentemente.
+
 

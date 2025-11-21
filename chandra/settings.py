@@ -28,10 +28,42 @@ class Settings(BaseSettings):
     CHANDRA_API_KEY: str | None = None
     CHANDRA_REQUIRE_API_KEY: bool = False
 
+    # API security hardening
+    CHANDRA_ALLOWED_ORIGINS: str = "*"
+    MAX_UPLOAD_MB: int = 25
+    MAX_IMAGE_PIXELS: int = 80_000_000
+    ALLOWED_FILE_EXTENSIONS: tuple[str, ...] = (
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".tif",
+        ".tiff",
+        ".bmp",
+        ".webp",
+        ".heic",
+        ".heif",
+    )
+    ALLOWED_FILE_MIME_TYPES: tuple[str, ...] = (
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/tiff",
+        "image/bmp",
+        "image/webp",
+        "image/heic",
+        "image/heif",
+    )
+
     @computed_field
     @property
     def TORCH_DTYPE(self) -> torch.dtype:
         return torch.bfloat16
+
+    @computed_field
+    @property
+    def MAX_UPLOAD_BYTES(self) -> int:
+        return self.MAX_UPLOAD_MB * 1024 * 1024
 
     class Config:
         env_file = find_dotenv("local.env")

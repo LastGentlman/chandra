@@ -181,7 +181,7 @@ You can also start your own vllm server with the `datalab-to/chandra` model.
 
 ### Configuration
 
-Settings can be configured via environment variables or a `local.env` file:
+Settings can be configured via environment variables or a `local.env` file (see `local.env.example` for a safe template):
 
 ```bash
 # Model settings
@@ -193,9 +193,12 @@ VLLM_API_BASE=http://localhost:8000/v1
 VLLM_MODEL_NAME=chandra
 VLLM_GPUS=0
 
-# API authentication (optional)
+# API authentication / security
 CHANDRA_API_KEY=your_secret_key_here
-CHANDRA_REQUIRE_API_KEY=false
+CHANDRA_REQUIRE_API_KEY=true
+CHANDRA_ALLOWED_ORIGINS=https://your-frontend.example.com
+CHANDRA_MAX_UPLOAD_MB=25
+CHANDRA_MAX_IMAGE_PIXELS=80000000
 ```
 
 ### Railway Deployment (API + Local GPU)

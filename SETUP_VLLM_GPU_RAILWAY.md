@@ -7,9 +7,9 @@ Esta guía explica cómo usar tu GPU local para vLLM mientras la API corre en Ra
 ```
 ┌─────────────────┐         ┌──────────────────┐         ┌──────────────┐
 │   Tu PC (GPU)   │         │ Cloudflare Tunnel│         │   Railway    │
-│                 │         │                  │         │              │
-│  vLLM :5000     │ ──────> │ chandra-vllm.    │ ──────> │  API :5000   │
-│  (GPU)          │         │ ingroy.com       │         │              │
+│                 │         │ / ngrok / VPN    │         │              │
+│  vLLM :5000     │ ──────> │  <tu dominio>    │ ──────> │  API :5000   │
+│  (GPU)          │         │                  │         │              │
 └─────────────────┘         └──────────────────┘         └──────────────┘
 ```
 
@@ -28,7 +28,7 @@ Este script:
 1. ✅ Inicia vLLM con GPU en el puerto 5000
 2. ✅ Espera a que esté listo
 3. ✅ Inicia Cloudflare Tunnel (ya configurado)
-4. ✅ Expone vLLM en: `https://chandra-vllm.ingroy.com/v1`
+4. ✅ Expone vLLM en: `https://<tu-tunel-publico>.example.com/v1`
 
 ### Verificar que vLLM funciona
 
@@ -46,8 +46,8 @@ Deberías ver una respuesta JSON con el modelo "chandra".
 #### Servicio API en Railway:
 
 ```
-# URL del vLLM público (usando tu Cloudflare Tunnel)
-VLLM_API_BASE=https://chandra-vllm.ingroy.com/v1
+# URL del vLLM público (usando tu túnel seguro)
+VLLM_API_BASE=https://<tu-tunel-publico>.example.com/v1
 
 # Nombre del modelo
 VLLM_MODEL_NAME=chandra
@@ -56,21 +56,23 @@ VLLM_MODEL_NAME=chandra
 VLLM_API_KEY=EMPTY
 
 # Autenticación de la API
-CHANDRA_API_KEY=chandra_live_a8f7b9052593f7bb773f8d3cb4f893b3be56b5fd81f1013b6281feb36ed25d62
+CHANDRA_API_KEY=<TU_CHANDRA_API_KEY>
 CHANDRA_REQUIRE_API_KEY=true
+CHANDRA_ALLOWED_ORIGINS=https://app.midominio.com
+CHANDRA_MAX_UPLOAD_MB=25
 ```
 
 #### Servicio Bot en Railway (si tienes uno):
 
 ```
 # Token de Telegram
-TELEGRAM_BOT_TOKEN=8503190770:AAG438RJS1diQ2SZlVythH15Lrwa1yR6mfA
+TELEGRAM_BOT_TOKEN=<TOKEN_DE_TELEGRAM>
 
 # URL de la API (URL pública de tu API en Railway)
 CHANDRA_API_URL=https://tu-api-en-railway.railway.app/api/ocr/image
 
 # API Key (debe ser la MISMA que en la API)
-CHANDRA_API_KEY=chandra_live_a8f7b9052593f7bb773f8d3cb4f893b3be56b5fd81f1013b6281feb36ed25d62
+CHANDRA_API_KEY=<TU_CHANDRA_API_KEY>
 ```
 
 **⚠️ IMPORTANTE:** 
@@ -119,7 +121,7 @@ cd ~/Desktop/chandra
 ./start_vllm_cloudflare.sh
 
 # En Railway: Configurar
-VLLM_API_BASE=https://chandra-vllm.ingroy.com/v1
+VLLM_API_BASE=https://<tu-tunel-publico>.example.com/v1
 ```
 
 ## Notas importantes
